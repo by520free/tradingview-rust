@@ -1,0 +1,31 @@
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+*.rmeta
+*.o
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+
+# WorkBuddy local data (memory, session state)
+.workbuddy/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.local
