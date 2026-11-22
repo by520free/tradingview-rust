@@ -45,9 +45,10 @@
 │   │   ├── lib.rs            Tauri 命令层 + 应用状态
 │   │   ├── main.rs           入口
 │   │   ├── core/
-│   │   │   ├── model.rs      数据模型（Bar/周期/指标请求）
-│   │   │   ├── indicators.rs 指标引擎（10 个指标 + 单测）
-│   │   │   └── backtest.rs   回测引擎（成交语义 + 4 个单测）
+│   │   │   ├── model.rs              数据模型（Bar/周期/指标请求）
+│   │   │   ├── indicators.rs         核心指标（10 个 + 单测 + 扩展分发）
+│   │   │   ├── indicators_extended.rs 扩展指标（20 个：WMA/CCI/ADX/CMF...）
+│   │   │   └── backtest.rs           回测引擎（成交语义 + 4 个单测）
 │   │   └── data/
 │   │       ├── binance.rs    Binance 公钥 REST 数据接入
 │   │       ├── ws.rs         实时 K 线 WebSocket
@@ -63,7 +64,7 @@
 └── 参考项目分析-wickline.md   Wickline 项目借鉴分析
 ```
 
-## 当前功能（阶段 1–4 已完成）
+## 当前功能（阶段 1–8 已完成）
 
 - [x] Tauri 2 + Vite + TypeScript 项目骨架
 - [x] KLineChart 10.x 图表（蜡烛图 + 成交量副图）
@@ -82,6 +83,14 @@
 - [x] **绘图工具**：自动列出 KLineChart 内置工具（趋势线/斐波那契/文字等）+ 一键清除（阶段 4）
 - [x] **历史回放**：播放/暂停、进度条拖拽、1×/2×/4× 速度（阶段 4）
 - [x] **实时订阅前端接线**：订阅开关 + 图表原生 subscribeBar 局部更新（阶段 4）
+- [x] **回测可视化**：买卖箭头画到主图（红▲买/绿▼卖）+ 权益曲线与回撤填充 + 买入持有对比（阶段 5）
+- [x] **指标扩展到 30 个**：新增 WMA/SMMA/STDEV/ROC/MOM/DEMA/TEMA/CCI/WILL%R/MFI/ADX/
+      Donchian/Keltner/Aroon/TRIX/BOP/CMF/ULT/DPO/PriceOsc（阶段 6）
+- [x] **指标参数可调**：已启用指标的参数输入框，改动后 Rust 重算（阶段 6）
+- [x] **多主题**：亮/暗双主题（跟随系统 + 手动切换 + localStorage 持久化），图表同步切换（阶段 7）
+- [x] **快捷键体系**：周期 1-6、空格回放、B 回测、E 脚本、T 主题、R 刷新、G 导出、Esc 清除、? 帮助（阶段 7）
+- [x] **图表导出 PNG**：KLineChart 原生 getConvertPictureUrl，导出按钮 + G 键（阶段 8）
+- [x] **价格预警**：目标价 + 上/下方向，触发时应用内提示 + 桌面通知（阶段 8）
 
 ## 环境要求
 
@@ -93,9 +102,11 @@
 ## 当前机器的验证状态
 
 已完成：
-- 前端 `npm run build` 通过：TypeScript 严格模式无错误，产物 250KB（gzip 67.3KB），
+- 前端 `npm run build` 通过：TypeScript 严格模式无错误，产物 262KB（gzip 70.8KB），
   Worker 正确拆分为独立 chunk（8.88KB）
-- Rust 三个核心算法模块（model/indicators/backtest）整体通过 rustc 类型检查（metadata 编译）
+- Rust 四个核心算法模块（model/indicators/indicators_extended/backtest）整体通过 rustc 类型检查（metadata 编译）
+- 用到的 KLineChart API（getConvertPictureUrl/setStyles/createIndicator 等）均在 d.ts 中确认存在，
+  且 tsc 严格模式校验通过
 - **实际运行验证的测试**（用 Node 真实执行，非仅类型检查）：
   - TA 库 10 项：SMA/EMA/RSI/BOLL/MACD/交叉/ATR/KDJ 全部通过
   - 脚本沙箱 11 项：三个示例脚本、plot/marker/hline、策略信号、块作用域全部通过

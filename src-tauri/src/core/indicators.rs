@@ -206,14 +206,20 @@ pub fn compute(bars: &[Bar], req: &IndicatorRequest) -> IndicatorResult {
             }
             vec![IndicatorLine { name: "OBV".into(), values }]
         }
-        _ => vec![],
+        _ => {
+            // 核心指标未命中时回退到扩展库。
+            return super::indicators_extended::compute_extended(bars, req)
+                .unwrap_or(IndicatorResult { lines: vec![] });
+        }
     };
     IndicatorResult { lines }
 }
 
-/// 返回支持的所有指标 kind，供前端展示菜单
+/// 返回支持的所有指标 kind，供前端展示菜单（核心 + 扩展）
 pub fn supported() -> Vec<&'static str> {
-    vec!["sma", "ema", "rsi", "macd", "boll", "atr", "kdj", "vwap", "volume_ma", "obv"]
+    let mut all = vec!["sma", "ema", "rsi", "macd", "boll", "atr", "kdj", "vwap", "volume_ma", "obv"];
+    all.extend(super::indicators_extended::supported_extended());
+    all
 }
 
 #[cfg(test)]

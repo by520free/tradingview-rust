@@ -95,6 +95,101 @@ const indicatorMeta: Record<string, IndicatorMeta> = {
     label: "OBV", params: [], series: "normal",
     figures: [{ title: "OBV", color: "#2980b9" }],
   },
+  wma: {
+    label: "WMA(20)", params: [20], series: "price",
+    figures: [{ title: "WMA20", color: "#16a085" }],
+  },
+  smma: {
+    label: "SMMA(20)", params: [20], series: "price",
+    figures: [{ title: "SMMA20", color: "#7f8c8d" }],
+  },
+  stdev: {
+    label: "STDEV(20)", params: [20], series: "normal",
+    figures: [{ title: "STDEV", color: "#e67e22" }],
+  },
+  roc: {
+    label: "ROC(12)", params: [12], series: "normal",
+    figures: [{ title: "ROC", color: "#2980b9" }],
+  },
+  mom: {
+    label: "MOM(10)", params: [10], series: "normal",
+    figures: [{ title: "MOM", color: "#8e44ad" }],
+  },
+  dema: {
+    label: "DEMA(20)", params: [20], series: "price",
+    figures: [{ title: "DEMA20", color: "#c0392b" }],
+  },
+  tema: {
+    label: "TEMA(20)", params: [20], series: "price",
+    figures: [{ title: "TEMA20", color: "#9b59b6" }],
+  },
+  cci: {
+    label: "CCI(20)", params: [20], series: "normal",
+    figures: [{ title: "CCI", color: "#e67e22" }],
+  },
+  willr: {
+    label: "WILL%R(14)", params: [14], series: "normal",
+    figures: [{ title: "WILL%R", color: "#16a085" }],
+  },
+  mfi: {
+    label: "MFI(14)", params: [14], series: "normal",
+    figures: [{ title: "MFI", color: "#8e44ad" }],
+  },
+  adx: {
+    label: "ADX(14)", params: [14], series: "normal",
+    figures: [
+      { title: "+DI", color: "#2f9e44" },
+      { title: "-DI", color: "#e03131" },
+      { title: "ADX", color: "#e67e22" },
+    ],
+  },
+  donchian: {
+    label: "Donchian(20)", params: [20], series: "price",
+    figures: [
+      { title: "UPPER", color: "#95a5a6" },
+      { title: "MID", color: "#e67e22" },
+      { title: "LOWER", color: "#95a5a6" },
+    ],
+  },
+  keltner: {
+    label: "Keltner(20,2)", params: [20, 2], series: "price",
+    figures: [
+      { title: "UPPER", color: "#95a5a6" },
+      { title: "MID", color: "#2980b9" },
+      { title: "LOWER", color: "#95a5a6" },
+    ],
+  },
+  aroon: {
+    label: "Aroon(25)", params: [25], series: "normal",
+    figures: [
+      { title: "UP", color: "#2f9e44" },
+      { title: "DOWN", color: "#e03131" },
+    ],
+  },
+  trix: {
+    label: "TRIX(15)", params: [15], series: "normal",
+    figures: [{ title: "TRIX", color: "#2980b9" }],
+  },
+  bop: {
+    label: "BOP", params: [], series: "normal",
+    figures: [{ title: "BOP", color: "#16a085" }],
+  },
+  cmf: {
+    label: "CMF(20)", params: [20], series: "normal",
+    figures: [{ title: "CMF", color: "#8e44ad" }],
+  },
+  uo: {
+    label: "Ult Osc", params: [], series: "normal",
+    figures: [{ title: "ULT", color: "#e67e22" }],
+  },
+  dpo: {
+    label: "DPO(20)", params: [20], series: "normal",
+    figures: [{ title: "DPO", color: "#2980b9" }],
+  },
+  posc: {
+    label: "Price Osc(12,26)", params: [12, 26], series: "normal",
+    figures: [{ title: "POSC", color: "#8e44ad" }],
+  },
 };
 
 // 自定义指标的计算结果：每条 figure 一个字段（line0/line1/...）。
@@ -118,6 +213,9 @@ app.innerHTML = `
       <button id="refresh-btn" class="control btn">刷新</button>
       <button id="realtime-btn" class="control btn">实时:关</button>
       <button id="script-toggle" class="control btn">脚本</button>
+      <button id="export-btn" class="control btn" title="导出图表 PNG (G)">导出</button>
+      <button id="theme-toggle" class="control btn theme-btn" title="切换主题">◐</button>
+      <button id="shortcut-help" class="control btn theme-btn" title="快捷键 (?)">?</button>
       <span id="status" class="status">就绪</span>
     </div>
   </header>
@@ -125,17 +223,34 @@ app.innerHTML = `
     <aside class="sidebar">
       <div class="panel-title">自选品种</div>
       <div id="symbol-list" class="symbol-list"></div>
-      <div class="panel-title" style="margin-top:16px">Rust 指标</div>
+      <div class="panel-title" style="margin-top:16px">Rust 指标 <span id="indicator-count" class="panel-count">0/30</span></div>
       <div id="indicator-list" class="indicator-list"></div>
+      <div id="indicator-params" class="indicator-params" hidden></div>
       <div class="panel-title" style="margin-top:16px">策略回测</div>
       <div class="backtest-box">
         <div class="bt-strategy">双均线交叉 <span class="bt-sub">MA5 × MA20</span></div>
         <button id="bt-run" class="bt-run">运行回测</button>
         <div id="bt-result" class="bt-result">尚未运行</div>
+        <div id="equity-wrap" class="equity-wrap" hidden>
+          <div class="equity-title">权益曲线 <span id="equity-bh" class="equity-bh"></span></div>
+          <canvas id="equity-canvas" class="equity-canvas"></canvas>
+        </div>
       </div>
       <div class="panel-title" style="margin-top:16px">绘图工具</div>
       <div id="drawing-list" class="drawing-list"></div>
       <button id="clear-drawings" class="control btn" style="width:100%;margin-top:6px">清除绘图</button>
+      <div class="panel-title" style="margin-top:16px">价格预警</div>
+      <div class="alert-box">
+        <div class="alert-input-row">
+          <input id="alert-price" class="alert-input" type="number" step="any" placeholder="目标价" />
+          <select id="alert-dir" class="alert-dir">
+            <option value="above">≥</option>
+            <option value="below">≤</option>
+          </select>
+          <button id="alert-add" class="alert-add">+</button>
+        </div>
+        <div id="alert-list" class="alert-list"></div>
+      </div>
       <div class="hint">指标与回测均由 Rust 核心计算<br/>经 Tauri IPC 传给图表</div>
     </aside>
     <section class="chart-area">
@@ -175,6 +290,21 @@ app.innerHTML = `
       </div>
     </div>
   </section>
+  <div id="shortcut-modal" class="shortcut-modal" hidden>
+    <div class="sc-card">
+      <div class="sc-title">快捷键</div>
+      <div class="sc-row"><span class="sc-desc">切换周期 1分/5分/15分/1时/4时/日线</span><span class="sc-key">1 2 3 4 5 6</span></div>
+      <div class="sc-row"><span class="sc-desc">回放播放 / 暂停</span><span class="sc-key">Space</span></div>
+      <div class="sc-row"><span class="sc-desc">运行回测</span><span class="sc-key">B</span></div>
+      <div class="sc-row"><span class="sc-desc">打开 / 收起脚本编辑器</span><span class="sc-key">E</span></div>
+      <div class="sc-row"><span class="sc-desc">切换明暗主题</span><span class="sc-key">T</span></div>
+      <div class="sc-row"><span class="sc-desc">刷新数据</span><span class="sc-key">R</span></div>
+      <div class="sc-row"><span class="sc-desc">导出图表 PNG</span><span class="sc-key">G</span></div>
+      <div class="sc-row"><span class="sc-desc">清除所有绘图</span><span class="sc-key">Esc</span></div>
+      <div class="sc-row"><span class="sc-desc">显示本帮助</span><span class="sc-key">?</span></div>
+      <button id="sc-close" class="sc-close">关闭</button>
+    </div>
+  </div>
 `;
 
 const statusEl = document.querySelector<HTMLSpanElement>("#status")!;
@@ -197,6 +327,96 @@ let replayTimer: ReturnType<typeof setInterval> | null = null;
 let realtimeOn = false;
 // KLineChart 通过 DataLoader.subscribeBar 注册的实时更新回调。
 let realtimeBarCallback: ((data: KLineData) => void) | null = null;
+// 回测结果中的买卖点，按 bar index 索引。切换品种/周期时清空。
+let backtestMarkersByIndex = new Map<number, "buy" | "sell">();
+// 不重新拉取数据、把当前 bars 重新喂给图表（用于绘制 marker / 权益曲线）。
+let feedFromCache = false;
+
+// 主题：跟随系统偏好，用户选择后存 localStorage。
+type ThemeMode = "light" | "dark";
+function preferredTheme(): ThemeMode {
+  const saved = localStorage.getItem("candlelab_theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+let currentTheme: ThemeMode = preferredTheme();
+// 保存最近一次回测结果，供主题切换时重绘权益曲线。
+let lastResult: BacktestResult | null = null;
+
+// 价格预警：{ 目标价, 方向 }，触及后触发一次并标记。
+interface PriceAlert { price: number; dir: "above" | "below"; fired: boolean; }
+let priceAlerts: PriceAlert[] = [];
+
+// 检查最新价是否触发预警。
+function checkPriceAlerts(price: number) {
+  let changed = false;
+  for (const a of priceAlerts) {
+    if (a.fired) continue;
+    const hit = a.dir === "above" ? price >= a.price : price <= a.price;
+    if (hit) {
+      a.fired = true;
+      changed = true;
+      const dirText = a.dir === "above" ? "涨至" : "跌至";
+      setStatus(`⚠ 预警: ${currentSymbol} ${dirText} ${a.price}`);
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("CandleLab 价格预警", {
+          body: `${currentSymbol} ${dirText} ${a.price}（当前 ${price}）`,
+        });
+      }
+    }
+  }
+  if (changed) renderAlertList();
+}
+
+function renderAlertList() {
+  const list = document.querySelector<HTMLDivElement>("#alert-list")!;
+  list.innerHTML = "";
+  if (priceAlerts.length === 0) {
+    list.textContent = "无预警";
+    return;
+  }
+  priceAlerts.forEach((a, i) => {
+    const row = document.createElement("div");
+    row.className = `alert-item${a.fired ? " fired" : ""}`;
+    const label = document.createElement("span");
+    label.textContent = `${a.dir === "above" ? "≥" : "≤"} ${a.price}`;
+    const del = document.createElement("button");
+    del.className = "alert-del";
+    del.textContent = "×";
+    del.title = "删除";
+    del.addEventListener("click", () => {
+      priceAlerts.splice(i, 1);
+      renderAlertList();
+    });
+    row.appendChild(label);
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+function exportChartPng() {
+  if (!chart) { setStatus("图表未就绪", "err"); return; }
+  try {
+    const url = chart.getConvertPictureUrl(true, "png", currentTheme === "dark" ? "#1e2128" : "#ffffff");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CandleLab_${currentSymbol}_${currentTimeframe}_${Date.now()}.png`;
+    a.click();
+    setStatus("图表已导出 PNG");
+  } catch (e) {
+    setStatus(`导出失败: ${String(e)}`, "err");
+  }
+}
+
+function applyTheme(theme: ThemeMode) {
+  currentTheme = theme;
+  document.body.dataset.theme = theme;
+  chart?.setStyles(theme);
+  const btn = document.querySelector<HTMLButtonElement>("#theme-toggle");
+  if (btn) btn.textContent = theme === "dark" ? "☀" : "◐";
+  // 权益曲线用 Canvas 手绘，换主题后按当前回测结果重画。
+  if (lastResult) renderEquityCurve(lastResult);
+}
 
 function setStatus(text: string, kind: "ok" | "err" | "busy" = "ok") {
   statusEl.textContent = text;
@@ -229,6 +449,38 @@ function registerRustIndicators() {
         }),
     });
   }
+  registerBacktestMarkerIndicator();
+}
+
+// 回测买卖箭头：用两个 text figure 分别画多空入场/出场。
+// calc 从 bar 扩展字段读 backtest marker（bt_<i>_<kind>），把值作为价格定位，
+// text 通过 attrs 回调返回箭头字符。无 marker 的 bar 返回 null，不绘制。
+interface MarkerValues { buy: number | null; sell: number | null; }
+
+function registerBacktestMarkerIndicator() {
+  registerIndicator<MarkerValues>({
+    name: "candlelab_bt_marker",
+    shortName: "买卖点",
+    series: "price",
+    calcParams: [],
+    figures: [
+      {
+        key: "buy", type: "text",
+        attrs: () => ({ text: "▲", align: "center", baseline: "bottom" }),
+        styles: () => ({ color: "#e03131", size: 14 }),
+      },
+      {
+        key: "sell", type: "text",
+        attrs: () => ({ text: "▼", align: "center", baseline: "top" }),
+        styles: () => ({ color: "#2f9e44", size: 14 }),
+      },
+    ],
+    calc: (dataList) =>
+      dataList.map((bar) => ({
+        buy: typeof bar["bt_buy"] === "number" ? bar["bt_buy"] : null,
+        sell: typeof bar["bt_sell"] === "number" ? bar["bt_sell"] : null,
+      })),
+  });
 }
 
 function toKLine(bars: Bar[]): KLineData[] {
@@ -241,9 +493,9 @@ function toKLine(bars: Bar[]): KLineData[] {
       close: b.close,
       volume: b.volume,
     };
-    // 把 Rust 指标值作为扩展字段带上，供自定义指标的 calc 读取。
+    // 把 Rust 指标值和回测 marker 作为扩展字段带上，供自定义指标的 calc 读取。
     for (const key of Object.keys(b)) {
-      if (key.startsWith("rust_")) k[key] = b[key];
+      if (key.startsWith("rust_") || key.startsWith("bt_")) k[key] = b[key];
     }
     return k;
   });
@@ -283,14 +535,39 @@ function syncIndicatorInstances() {
   }
 }
 
+// 把当前回测 marker 挂到 bars 扩展字段（先清后挂，避免切换后残留）。
+function applyMarkersToBars() {
+  for (const bar of currentBars) {
+    delete bar["bt_buy"];
+    delete bar["bt_sell"];
+  }
+  for (const [index, kind] of backtestMarkersByIndex) {
+    const bar = currentBars[index];
+    if (!bar) continue;
+    // 买点标在最低价下方，卖点标在最高价上方，避免遮挡 K 线。
+    const range = Math.max(bar.high - bar.low, bar.close * 0.002);
+    if (kind === "buy") bar["bt_buy"] = bar.low - range * 0.6;
+    else bar["bt_sell"] = bar.high + range * 0.6;
+  }
+}
+
+// 只重喂现有 bars，不触发网络请求（绘制 marker 时用）。
+function refeedChart() {
+  if (!chart || currentBars.length === 0) return;
+  feedFromCache = true;
+  chart.setDataLoader(makeDataLoader());
+}
+
 function makeDataLoader(): DataLoader {
   return {
     getBars: async ({ callback }) => {
       try {
-        setStatus("加载数据中…", "busy");
-        const bars = await fetchBars(currentSymbol, currentTimeframe, 1000);
-        currentBars = bars;
+        const useCache = feedFromCache;
+        feedFromCache = false;
+        if (!useCache) setStatus("加载数据中…", "busy");
+        if (!useCache) currentBars = await fetchBars(currentSymbol, currentTimeframe, 1000);
         await enrichBarsWithIndicators();
+        applyMarkersToBars();
         // 回放时只显示前 replayCount 根，否则全部。
         const display = replayCount >= 0 && replayCount < currentBars.length
           ? currentBars.slice(0, replayCount)
@@ -298,8 +575,13 @@ function makeDataLoader(): DataLoader {
         callback(toKLine(display));
         // 数据就绪后再创建指标实例，calc 能立刻拿到扩展字段里的值。
         syncIndicatorInstances();
-        const suffix = replayCount >= 0 ? ` · 回放 ${display.length}/${bars.length}` : "";
-        setStatus(`${currentSymbol} · ${bars.length} 根 K 线${suffix}`);
+        syncMarkerIndicator();
+        const suffix = replayCount >= 0 ? ` · 回放 ${display.length}/${currentBars.length}` : "";
+        setStatus(`${currentSymbol} · ${currentBars.length} 根 K 线${suffix}`);
+        // 数据就绪后用最新价检查一次预警（缓存重喂时也检查，避免漏触发）。
+        if (!useCache && currentBars.length > 0) {
+          checkPriceAlerts(currentBars[currentBars.length - 1].close);
+        }
       } catch (e) {
         setStatus(`加载失败: ${String(e)}`, "err");
         callback([]);
@@ -309,6 +591,16 @@ function makeDataLoader(): DataLoader {
     subscribeBar: ({ callback }) => { realtimeBarCallback = callback; },
     unsubscribeBar: () => { realtimeBarCallback = null; },
   };
+}
+
+// marker 指标实例创建一次即可。切换品种后 marker 变空，calc 返回全 null 自然不画；
+// 再次回测时 refeed 触发 calc 重算，无需删除重建。
+function syncMarkerIndicator() {
+  if (!chart) return;
+  const name = "candlelab_bt_marker";
+  if (createdIndicators.has(name)) return;
+  const id = chart.createIndicator(name);
+  if (id) createdIndicators.add(name);
 }
 
 function renderIndicatorList() {
@@ -329,6 +621,57 @@ function renderIndicatorList() {
     );
     if (btn) btn.classList.add("active");
   }
+  const countEl = document.querySelector<HTMLSpanElement>("#indicator-count");
+  if (countEl) countEl.textContent = `${activeIndicators.size}/${supportedIndicators.length}`;
+  renderIndicatorParams();
+}
+
+// 参数名提示：按指标顺序给出中文标签，缺失时用「参数N」。
+const paramNames: Record<string, string[]> = {
+  sma: ["周期"], ema: ["周期"], rsi: ["周期"], boll: ["周期", "标准差倍数"],
+  atr: ["周期"], kdj: ["周期"], volume_ma: ["周期"],
+  macd: ["快线", "慢线", "信号"], keltner: ["周期", "倍数"], posc: ["快线", "慢线"],
+};
+
+// 渲染已启用指标的参数输入框，改动后重算并刷新。
+function renderIndicatorParams() {
+  const box = document.querySelector<HTMLDivElement>("#indicator-params")!;
+  box.innerHTML = "";
+  if (activeIndicators.size === 0) { box.hidden = true; return; }
+  box.hidden = false;
+  const title = document.createElement("div");
+  title.className = "ip-title";
+  title.textContent = "指标参数";
+  box.appendChild(title);
+
+  for (const [kind, req] of activeIndicators) {
+    const meta = indicatorMeta[kind];
+    if (!meta || meta.params.length === 0) continue;
+    const row = document.createElement("div");
+    row.className = "ip-row";
+    const name = document.createElement("span");
+    name.className = "ip-name";
+    name.textContent = meta.label.split("(")[0];
+    row.appendChild(name);
+    meta.params.forEach((_, i) => {
+      const input = document.createElement("input");
+      input.type = "number";
+      input.className = "ip-input";
+      input.value = String(req.params[i] ?? meta.params[i]);
+      input.min = "1";
+      input.title = paramNames[kind]?.[i] ?? `参数${i + 1}`;
+      input.addEventListener("change", () => {
+        const v = Number(input.value);
+        if (!Number.isFinite(v) || v <= 0) { input.value = String(req.params[i]); return; }
+        req.params[i] = v;
+        // refeed 会用新参数让 Rust 重算扩展字段，图表 calc 自动重读。
+        refeedChart();
+        setStatus(`${meta.label.split("(")[0]} 参数已更新`);
+      });
+      row.appendChild(input);
+    });
+    box.appendChild(row);
+  }
 }
 
 function toggleIndicator(kind: string, btn: HTMLButtonElement) {
@@ -341,11 +684,15 @@ function toggleIndicator(kind: string, btn: HTMLButtonElement) {
   } else {
     activeIndicators.set(kind, {
       kind,
-      params: indicatorMeta[kind]?.params ?? [],
+      params: [...(indicatorMeta[kind]?.params ?? [])],
     });
     btn.classList.add("active");
   }
-  // 重新走一次数据管线：Rust 重算 → 写入扩展字段 → 图表重绘。
+  const countEl = document.querySelector<HTMLSpanElement>("#indicator-count");
+  if (countEl) countEl.textContent = `${activeIndicators.size}/${supportedIndicators.length}`;
+  renderIndicatorParams();
+  // 切换指标（非参数微调）需要重新拉取数据走完整管线。
+  clearBacktestVisuals();
   if (chart) chart.setDataLoader(makeDataLoader());
 }
 
@@ -585,6 +932,7 @@ async function toggleRealtime() {
       if (realtimeBarCallback && replayCount < 0) {
         realtimeBarCallback(toKLine([bar])[0]);
       }
+      checkPriceAlerts(bar.close);
     });
     realtimeOn = true;
     btn.textContent = "实时:开";
@@ -657,8 +1005,10 @@ async function onRunBacktest() {
       signals,
       [],
     );
+    lastResult = result;
     renderBacktestResult(result);
     drawBacktestMarkers(result);
+    renderEquityCurve(result);
     setStatus(`回测完成 · ${result.stats.trades} 笔交易`);
   } catch (e) {
     resultEl.textContent = `回测失败: ${String(e)}`;
@@ -681,12 +1031,84 @@ function renderBacktestResult(r: BacktestResult) {
   `;
 }
 
+// 把回测 marker 转成按 bar index 的 buy/sell 映射，再重喂图表让自定义指标画出箭头。
 function drawBacktestMarkers(r: BacktestResult) {
-  if (!chart) return;
-  // 用 SVG overlay 在图上画买卖箭头：通过 KLineChart 的 overlay 插件较复杂，
-  // 这里用轻量方案——把每个 marker 的价格和时间写到窗口变量，供自定义 overlay 读取。
-  // MVP 阶段先在状态栏提示，箭头绘制在阶段 4 的绘图工具里统一接入。
-  (window as unknown as Record<string, unknown>).__candlelabBacktestMarkers = r.markers;
+  backtestMarkersByIndex.clear();
+  for (const m of r.markers) {
+    const isBuy = (m.kind === "entry" && m.side === "long") ||
+                  (m.kind === "exit" && m.side === "short");
+    backtestMarkersByIndex.set(m.index, isBuy ? "buy" : "sell");
+  }
+  refeedChart();
+}
+
+// 用 Canvas 画权益曲线 + 回撤填充。侧栏窄，画紧凑的双线图。
+function renderEquityCurve(r: BacktestResult) {
+  const wrap = document.querySelector<HTMLDivElement>("#equity-wrap")!;
+  const canvas = document.querySelector<HTMLCanvasElement>("#equity-canvas")!;
+  const bhEl = document.querySelector<HTMLSpanElement>("#equity-bh")!;
+  if (!r.equity || r.equity.length < 2 || !r.drawdown) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  const bhClass = r.buy_hold_pct >= 0 ? "bt-pos" : "bt-neg";
+  bhEl.innerHTML = `买入持有 ${r.buy_hold_pct.toFixed(1)}%`;
+  bhEl.className = `equity-bh ${bhClass}`;
+
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = 174;
+  const cssH = 66;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  const ctx = canvas.getContext("2d")!;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const n = r.equity.length;
+  const eq = r.equity;
+  let min = Infinity, max = -Infinity;
+  for (const v of eq) { if (v < min) min = v; if (v > max) max = v; }
+  const pad = 4;
+  const span = max - min || 1;
+  const x = (i: number) => (i / (n - 1)) * (cssW - 2 * pad) + pad;
+  const y = (v: number) => cssH - pad - ((v - min) / span) * (cssH - 2 * pad);
+
+  // 回撤填充（底部红色渐弱区域，表示水下区间）。
+  const maxDD = Math.max(...r.drawdown, 0.0001);
+  ctx.fillStyle = "rgba(224,49,49,0.16)";
+  ctx.beginPath();
+  ctx.moveTo(pad, cssH - pad);
+  for (let i = 0; i < n; i++) {
+    const h = (r.drawdown[i] / maxDD) * (cssH - 2 * pad);
+    ctx.lineTo(x(i), cssH - pad - h);
+  }
+  ctx.lineTo(x(n - 1), cssH - pad);
+  ctx.closePath();
+  ctx.fill();
+
+  // 权益线。
+  ctx.strokeStyle = "#1971c2";
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const px = x(i), py = y(eq[i]);
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // 起始资金基准虚线。
+  const start = r.equity[0];
+  ctx.strokeStyle = "rgba(108,117,125,0.5)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(pad, y(start));
+  ctx.lineTo(cssW - pad, y(start));
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 function renderSymbolList(symbols: string[]) {
@@ -715,10 +1137,20 @@ function highlightSymbol() {
   });
 }
 
+function clearBacktestVisuals() {
+  backtestMarkersByIndex.clear();
+  lastResult = null;
+  const wrap = document.querySelector<HTMLDivElement>("#equity-wrap");
+  const resultEl = document.querySelector<HTMLDivElement>("#bt-result");
+  if (wrap) wrap.hidden = true;
+  if (resultEl) resultEl.textContent = "尚未运行";
+}
+
 async function switchSymbol(symbol: string) {
   currentSymbol = symbol;
   symbolSelect.value = symbol;
   highlightSymbol();
+  clearBacktestVisuals();
   if (chart) {
     chart.setSymbol({ ticker: symbol, pricePrecision: 2, volumePrecision: 3 });
     chart.setDataLoader(makeDataLoader());
@@ -743,6 +1175,7 @@ function bindEvents() {
       document.querySelectorAll(".tf").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       currentTimeframe = btn.dataset.tf as Timeframe;
+      clearBacktestVisuals();
       if (chart) {
         chart.setPeriod(periodOf(currentTimeframe));
         chart.setDataLoader(makeDataLoader());
@@ -814,6 +1247,83 @@ function bindEvents() {
     }
   });
 
+  // 导出 PNG
+  document.querySelector<HTMLButtonElement>("#export-btn")!.addEventListener("click", exportChartPng);
+
+  // 价格预警
+  document.querySelector<HTMLButtonElement>("#alert-add")!.addEventListener("click", () => {
+    const input = document.querySelector<HTMLInputElement>("#alert-price")!;
+    const dirSel = document.querySelector<HTMLSelectElement>("#alert-dir")!;
+    const price = Number(input.value);
+    if (!Number.isFinite(price) || price <= 0) { setStatus("请输入有效目标价", "err"); return; }
+    if (priceAlerts.length >= 20) { setStatus("预警数量上限 20", "err"); return; }
+    priceAlerts.push({ price, dir: dirSel.value as "above" | "below", fired: false });
+    input.value = "";
+    renderAlertList();
+    setStatus(`已添加预警 ${dirSel.value === "above" ? "≥" : "≤"} ${price}`);
+    // 首次添加时请求桌面通知权限（用户主动操作，不打扰）。
+    if ("Notification" in window && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+    // 添加后立即检查当前价（若已满足则马上触发）。
+    if (currentBars.length > 0) checkPriceAlerts(currentBars[currentBars.length - 1].close);
+  });
+
+  // 主题切换
+  document.querySelector<HTMLButtonElement>("#theme-toggle")!.addEventListener("click", () => {
+    const next: ThemeMode = currentTheme === "dark" ? "light" : "dark";
+    localStorage.setItem("candlelab_theme", next);
+    applyTheme(next);
+    setStatus(`已切换至${next === "dark" ? "暗" : "亮"}色主题`);
+  });
+
+  // 快捷键帮助
+  const modal = document.querySelector<HTMLDivElement>("#shortcut-modal")!;
+  const openHelp = () => { modal.hidden = false; };
+  const closeHelp = () => { modal.hidden = true; };
+  document.querySelector<HTMLButtonElement>("#shortcut-help")!.addEventListener("click", openHelp);
+  document.querySelector<HTMLButtonElement>("#sc-close")!.addEventListener("click", closeHelp);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeHelp(); });
+
+  // 全局快捷键（输入框聚焦时不响应，避免干扰输入）。
+  window.addEventListener("keydown", (e) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    if (e.key === "Escape") {
+      if (!modal.hidden) { closeHelp(); return; }
+      if (typing) return;
+      chart?.removeOverlay();
+      setStatus("已清除所有绘图");
+      return;
+    }
+    if (typing || modal.hidden === false) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    const tfKeys: Record<string, Timeframe> = {
+      "1": "1m", "2": "5m", "3": "15m", "4": "1h", "5": "4h", "6": "1d",
+    };
+    if (tfKeys[e.key]) {
+      const tf = tfKeys[e.key];
+      const btn = document.querySelector<HTMLButtonElement>(`.tf[data-tf="${tf}"]`);
+      btn?.click();
+      e.preventDefault();
+      return;
+    }
+    switch (e.key.toLowerCase()) {
+      case " ": {
+        e.preventDefault();
+        document.querySelector<HTMLButtonElement>("#replay-toggle")!.click();
+        break;
+      }
+      case "b": document.querySelector<HTMLButtonElement>("#bt-run")!.click(); break;
+      case "e": showScriptPanel(!document.querySelector<HTMLElement>("#script-panel")!.classList.contains("open")); break;
+      case "t": document.querySelector<HTMLButtonElement>("#theme-toggle")!.click(); break;
+      case "r": document.querySelector<HTMLButtonElement>("#refresh-btn")!.click(); break;
+      case "g": exportChartPng(); break;
+      case "?": openHelp(); break;
+    }
+  });
+
   window.addEventListener("resize", () => chart?.resize());
 }
 
@@ -829,12 +1339,15 @@ function periodOf(tf: Timeframe): { type: "minute" | "hour" | "day"; span: numbe
 }
 
 async function main() {
+  document.body.dataset.theme = currentTheme;
+  const themeBtn = document.querySelector<HTMLButtonElement>("#theme-toggle");
+  if (themeBtn) themeBtn.textContent = currentTheme === "dark" ? "☀" : "◐";
   registerRustIndicators();
   registerScriptPlotIndicator();
   document.querySelector<HTMLTextAreaElement>("#sp-code")!.value = scriptExamples.ma;
   chart = init(chartEl, {
     locale: "zh-CN",
-    styles: "light",
+    styles: currentTheme,
   });
   if (!chart) {
     setStatus("图表初始化失败", "err");
@@ -844,6 +1357,7 @@ async function main() {
   chart.setDataLoader(makeDataLoader());
   bindEvents();
   renderDrawingTools();
+  renderAlertList();
   await loadSymbols();
 }
 
