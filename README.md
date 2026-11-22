@@ -7,37 +7,51 @@
 ## 架构
 
 ```
-┌─────────────────────────────────────┐
-│  前端 (TS + KLineChart)             │
-│  三栏布局 / K线渲染 / 周期切换       │
-└──────────────┬──────────────────────┘
-               │ Tauri IPC
-┌──────────────▼──────────────────────┐
-│  Rust 核心 (candlelab_lib)          │
-│  ├─ data/binance.rs   行情拉取      │
-│  ├─ core/indicators.rs 指标计算     │
-│  └─ lib.rs            命令层/缓存   │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│  前端 (TS + KLineChart 10)                   │
+│  · K线/成交量 · 指标叠加 · 绘图工具 · 回放    │
+│  · JS 脚本沙箱(Web Worker) · 实时订阅         │
+└────────────────┬─────────────────────────────┘
+                 │ Tauri IPC (invoke + Channel)
+┌────────────────▼─────────────────────────────┐
+│  Rust 核心 (candlelab_lib)                   │
+│  ├─ data/binance.rs     REST 行情拉取         │
+│  ├─ data/ws.rs          实时 K 线 WebSocket  │
+│  ├─ data/csv.rs         CSV 导入             │
+│  ├─ core/indicators.rs  10 个技术指标         │
+│  ├─ core/backtest.rs    事件驱动回测引擎      │
+│  └─ lib.rs              命令层 + 内存缓存    │
+└──────────────────────────────────────────────┘
 ```
+
+设计要点：脚本用 JS 写在 Web Worker 沙箱里（3 秒超时、危险 API 遮蔽），
+但**成交逻辑始终由 Rust 回测引擎执行**——脚本只产出信号，保持 Rust 作为计算核心。
 
 ## 目录结构
 
 ```
 .
 ├── src/                      前端源码
-│   ├── main.ts               主逻辑：图表初始化、DataLoader、事件
-│   ├── api.ts                Tauri invoke 封装
-│   ├── types.ts              共享类型
-│   └── style.css             样式
+│   ├── main.ts               主逻辑：图表/指标叠加/回测面板/回放/实时/绘图
+│   ├── api.ts                Tauri invoke 封装（含 Channel/CSV）
+│   ├── types.ts              共享类型（含回测类型）
+│   ├── style.css             样式
+│   └── scripts/
+│       ├── ta.ts             脚本用精简指标库（纯函数）
+│       ├── script-worker.ts  Web Worker 沙箱运行时
+│       └── script-host.ts    主线程侧 Worker 管理 + 超时终止
 ├── src-tauri/                Rust 后端
 │   ├── src/
 │   │   ├── lib.rs            Tauri 命令层 + 应用状态
 │   │   ├── main.rs           入口
 │   │   ├── core/
 │   │   │   ├── model.rs      数据模型（Bar/周期/指标请求）
-│   │   │   └── indicators.rs 指标引擎（10 个指标 + 单测）
+│   │   │   ├── indicators.rs 指标引擎（10 个指标 + 单测）
+│   │   │   └── backtest.rs   回测引擎（成交语义 + 4 个单测）
 │   │   └── data/
-│   │       └── binance.rs    Binance 公钥 REST 数据接入
+│   │       ├── binance.rs    Binance 公钥 REST 数据接入
+│   │       ├── ws.rs         实时 K 线 WebSocket
+│   │       └── csv.rs        CSV 导入
 │   ├── Cargo.toml
 │   ├── tauri.conf.json
 │   └── icons/icon.png
@@ -45,10 +59,11 @@
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
-└── 方案工作量调研-A_vs_B.md   方案选型调研报告
+├── 方案工作量调研-A_vs_B.md   方案选型调研报告
+└── 参考项目分析-wickline.md   Wickline 项目借鉴分析
 ```
 
-## 当前功能（MVP 阶段）
+## 当前功能（阶段 1–4 已完成）
 
 - [x] Tauri 2 + Vite + TypeScript 项目骨架
 - [x] KLineChart 10.x 图表（蜡烛图 + 成交量副图）
@@ -58,10 +73,15 @@
 - [x] Binance 实时 K 线 WebSocket 订阅（Tauri Channel 推送，仅收盘 bar）
 - [x] CSV 导入（自动识别表头、逗号/制表符、时间戳/日期格式）
 - [x] Rust 指标引擎：SMA、EMA、RSI、MACD、BOLL、ATR、KDJ、VWAP、VOL MA、OBV（含单测）
-- [x] 前端指标按钮，由 Rust 计算后经 IPC 返回
-- [ ] 指标线可视化叠加到主图/副图（当前结果写入 bar 扩展字段，待做脚本渲染）
-- [ ] 历史回放
-- [ ] 绘图工具（KLineChart 自带 16 种，待接入工具栏）
+- [x] **指标线真正画到图上**：主图（SMA/EMA/BOLL/VWAP）+ 副图（RSI/MACD/KDJ/ATR/OBV），
+      通过自定义指标 + K 线扩展字段实现（阶段 1）
+- [x] **Rust 回测引擎**：防未来函数（信号 close 产生、下一根 open 成交）、跳空按 open、
+      止损优先、手续费/滑点、完整统计；内置双均线交叉策略面板（阶段 2）
+- [x] **JS 脚本沙箱**：Web Worker 隔离、3 秒超时、危险 API 遮蔽、错误行号映射、
+      策略信号交给 Rust 执行；内置均线/RSI/策略三个示例（阶段 3）
+- [x] **绘图工具**：自动列出 KLineChart 内置工具（趋势线/斐波那契/文字等）+ 一键清除（阶段 4）
+- [x] **历史回放**：播放/暂停、进度条拖拽、1×/2×/4× 速度（阶段 4）
+- [x] **实时订阅前端接线**：订阅开关 + 图表原生 subscribeBar 局部更新（阶段 4）
 
 ## 环境要求
 
@@ -73,9 +93,14 @@
 ## 当前机器的验证状态
 
 已完成：
-- 前端 `npm run build` 通过：TypeScript 严格模式无错误，产物 234KB（gzip 61.7KB）
-- Rust 核心算法模块通过 rustc 类型检查（metadata 编译）
-- 指标单测代码已写好（`cargo test --lib` 待装构建工具后运行）
+- 前端 `npm run build` 通过：TypeScript 严格模式无错误，产物 250KB（gzip 67.3KB），
+  Worker 正确拆分为独立 chunk（8.88KB）
+- Rust 三个核心算法模块（model/indicators/backtest）整体通过 rustc 类型检查（metadata 编译）
+- **实际运行验证的测试**（用 Node 真实执行，非仅类型检查）：
+  - TA 库 10 项：SMA/EMA/RSI/BOLL/MACD/交叉/ATR/KDJ 全部通过
+  - 脚本沙箱 11 项：三个示例脚本、plot/marker/hline、策略信号、块作用域全部通过
+- 指标单测 + 回测单测（4 个：防未来函数/止损优先/跳空按 open/手续费滑点）代码已写好，
+  `cargo test --lib` 待装构建工具后运行
 
 **阻塞项**：当前机器没有 Visual Studio Build Tools / Windows SDK，Rust 依赖的 build script 无法链接（缺 `kernel32.lib` 等）。这是 Tauri 在 Windows 上的硬性要求，`cargo check` 也绕不过去。运行前的第一步是装构建工具：
 

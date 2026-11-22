@@ -1,6 +1,7 @@
 mod core;
 mod data;
 
+use core::backtest::{BacktestConfig, BacktestResult, Signal};
 use core::model::{Bar, IndicatorRequest, IndicatorResult, Timeframe};
 use tauri::Emitter;
 use std::collections::HashMap;
@@ -72,6 +73,24 @@ fn compute_indicators(
         .collect())
 }
 
+/// 运行回测。bars 从缓存取，前端只传信号序列，保证信号与 K 线等长对齐。
+#[tauri::command]
+fn run_backtest(
+    symbol: String,
+    timeframe: Timeframe,
+    config: BacktestConfig,
+    signals: Vec<Signal>,
+    close_signals: Vec<Signal>,
+    state: tauri::State<'_, AppState>,
+) -> Result<BacktestResult, String> {
+    let key = cache_key(&symbol, timeframe);
+    let cache = state.bars_cache.lock().unwrap();
+    let bars = cache
+        .get(&key)
+        .ok_or_else(|| "请先加载 K 线数据".to_string())?;
+    Ok(core::backtest::run(bars, &config, &signals, &close_signals))
+}
+
 #[tauri::command]
 fn list_indicators() -> Vec<&'static str> {
     core::indicators::supported()
@@ -115,8 +134,11 @@ pub fn run() {
             fetch_bars,
             reload_bars,
             compute_indicators,
+            run_backtest,
             list_indicators,
-            list_symbols
+            list_symbols,
+            subscribe_realtime,
+            import_csv
         ])
         .run(tauri::generate_context!())
         .expect("error while running CandleLab");
