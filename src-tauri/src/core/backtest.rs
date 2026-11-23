@@ -10,10 +10,11 @@ use super::model::Bar;
 use serde::{Deserialize, Serialize};
 
 /// 仓位 sizing 方式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SizeType {
     /// size_value 为权益的百分比（如 100 = 满仓）
+    #[default]
     Percent,
     /// size_value 为固定现金金额
     Cash,
@@ -22,10 +23,11 @@ pub enum SizeType {
 }
 
 /// 成交时机
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FillOn {
     /// 下一根 bar 的 open 成交（默认，防未来函数）
+    #[default]
     Open,
     /// 当前 bar 的 close 成交
     Close,
@@ -381,6 +383,18 @@ pub fn run(bars: &[Bar], config: &BacktestConfig, signals: &[Signal], close_sign
         equity[i] = equity_at(&lots, realized, config.initial_capital, b.close);
     }
 
+    // 数据结束时仍有未平仓位：按最后一根 bar 的收盘价强制平仓入账，
+    // 否则这笔交易的盈亏会凭空消失（trades 统计与最终权益对不上）。
+    if let Some(last_bar) = bars.last() {
+        if !lots.is_empty() {
+            let last_index = n.saturating_sub(1);
+            for l in std::mem::take(&mut lots) {
+                close_lot(l, last_bar.close, last_index, "End of data", config, &mut realized, &mut commission_paid, &mut trades, &mut markers);
+            }
+            equity[last_index] = config.initial_capital + realized;
+        }
+    }
+
     // 权益曲线与最大回撤
     let first = bars.first().map(|b| b.close).unwrap_or(0.0);
     let mut peak = f64::NEG_INFINITY;
@@ -495,10 +509,12 @@ mod tests {
 
     #[test]
     fn gap_open_fills_at_open_not_stop_price() {
-        // 第 11 根跳空低开到 90，止损位 95，应按 open=90 成交而非 95。
+        // 第 11 根以 100 开仓，止损位 95；第 12 根跳空低开到 90（已穿过止损），
+        // 应按 open=90 成交，而不是命令价 95。
         let mut data = bars(20, 100.0);
-        data[11].open = 90.0;
-        data[11].high = 91.0;
+        data[12].open = 90.0;
+        data[12].high = 91.0;
+        data[12].low = 89.0;
         let cfg = BacktestConfig { stop_loss: 5.0, ..Default::default() };
         let r = run(&data, &cfg, &[signal(20, 10, Direction::Long)], &[]);
         let exit = r.trades.iter().find(|t| t.reason == "Stop loss").expect("应止损");

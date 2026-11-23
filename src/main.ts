@@ -25,7 +25,7 @@ import type {
   Signal,
   Timeframe,
 } from "./types";
-import { ScriptHost } from "./scripts/script-host";
+import { ScriptHost, type ScriptHline, type ScriptFill, type ScriptPlot } from "./scripts/script-host";
 
 // 每个 Rust 指标的展示元数据：线数、颜色、画在哪个窗格。
 // figures 的数量和顺序必须与 Rust 侧 compute() 返回的 lines 一一对应。
@@ -229,6 +229,22 @@ app.innerHTML = `
       <div class="panel-title" style="margin-top:16px">策略回测</div>
       <div class="backtest-box">
         <div class="bt-strategy">双均线交叉 <span class="bt-sub">MA5 × MA20</span></div>
+        <details class="bt-config" id="bt-config">
+          <summary>回测参数 <span class="bt-sub">点击调整</span></summary>
+          <div class="bt-config-body">
+            <div class="btp-row"><label>初始资金</label><input data-btp="initial_capital" type="number" min="1" step="1000"></div>
+            <div class="btp-row"><label>仓位方式</label><select data-btp="size_type"><option value="percent">权益百分比</option><option value="cash">固定金额</option><option value="fixed">固定数量</option></select></div>
+            <div class="btp-row"><label>仓位值</label><input data-btp="size_value" type="number" min="0" step="1"></div>
+            <div class="btp-row"><label>手续费 %</label><input data-btp="commission" type="number" min="0" step="0.01"></div>
+            <div class="btp-row"><label>滑点 %</label><input data-btp="slippage" type="number" min="0" step="0.01"></div>
+            <div class="btp-row"><label>加仓层数</label><input data-btp="pyramiding" type="number" min="1" step="1"></div>
+            <div class="btp-row"><label>成交时机</label><select data-btp="fill_on"><option value="open">下根开盘（防未来）</option><option value="close">当根收盘</option></select></div>
+            <div class="btp-row"><label>止损 %</label><input data-btp="stop_loss" type="number" min="0" step="0.5"></div>
+            <div class="btp-row"><label>止盈 %</label><input data-btp="take_profit" type="number" min="0" step="0.5"></div>
+            <div class="btp-row"><label>追踪止损 %</label><input data-btp="trailing" type="number" min="0" step="0.5"></div>
+            <button id="bt-config-reset" class="btn btp-reset">恢复默认参数</button>
+          </div>
+        </details>
         <button id="bt-run" class="bt-run">运行回测</button>
         <div id="bt-result" class="bt-result">尚未运行</div>
         <div id="equity-wrap" class="equity-wrap" hidden>
@@ -709,7 +725,9 @@ marker(crossAbove(fast, slow), { shape: 'arrowUp', position: 'belowBar', color: 
 log('快线末值', fast[n-1]);`,
   rsi: `indicator('RSI 教学', { overlay: false, precision: 2 });
 const r = ta.rsi(close, 14);
-plot(r, { title: 'RSI14', color: '#8e44ad' });
+const mid = plot(r, { title: 'RSI14', color: '#8e44ad' });
+const band = plot(50, { title: '中轴', color: '#95a5a6' });
+fill(mid, band, { color: 'rgba(142,68,173,0.15)' });
 hline(70, { color: '#d32f2f' });
 hline(30, { color: '#1e9e6a' });
 log('当前 RSI', r[n-1]);`,
@@ -741,6 +759,106 @@ function registerScriptPlotIndicator() {
         }),
     });
   }
+}
+
+// hline / fill 的颜色存在 bar 扩展字段里，figure 的 styles 回调从中读取。
+interface OverlayValues extends Record<string, number | null | string> {}
+
+const MAX_SCRIPT_HLINES = 8;
+const MAX_SCRIPT_FILLS = 6;
+
+function registerScriptOverlayIndicators() {
+  for (let i = 0; i < MAX_SCRIPT_HLINES; i++) {
+    registerIndicator<OverlayValues>({
+      name: `rust_script_hline_${i}`,
+      shortName: `参考线${i + 1}`,
+      series: "price",
+      calcParams: [],
+      figures: [{
+        key: "v", type: "line",
+        styles: (p) => ({ color: String(p.data.current?.["c"] ?? "#8E8A82"), style: "dashed" } as never),
+      }],
+      calc: (dataList) => dataList.map((bar) => {
+        const v = bar[`sh_${i}`];
+        return { v: typeof v === "number" && Number.isFinite(v) ? v : null, c: String(bar[`shc_${i}`] ?? "") };
+      }),
+    });
+  }
+  for (let i = 0; i < MAX_SCRIPT_FILLS; i++) {
+    registerIndicator<OverlayValues>({
+      name: `rust_script_fill_${i}`,
+      shortName: `区间${i + 1}`,
+      series: "price",
+      calcParams: [],
+      figures: [{
+        key: "hi", type: "bar",
+        attrs: (p) => {
+          const cur = p.data.current;
+          if (!cur || cur["hi"] == null || cur["lo"] == null) return null;
+          const y1 = p.coordinate.current["hi"];
+          const y2 = p.coordinate.current["lo"];
+          if (!Number.isFinite(y1) || !Number.isFinite(y2)) return null;
+          return { y: Math.min(y1, y2), height: Math.max(1, Math.abs(y1 - y2)), width: p.barSpace.bar } as never;
+        },
+        styles: (p) => ({ color: String(p.data.current?.["c"] ?? "rgba(79,163,247,0.18)"), style: "fill" } as never),
+      }],
+      calc: (dataList) => dataList.map((bar) => {
+        const hi = bar[`sf_hi_${i}`];
+        const lo = bar[`sf_lo_${i}`];
+        return {
+          hi: typeof hi === "number" && Number.isFinite(hi) ? hi : null,
+          lo: typeof lo === "number" && Number.isFinite(lo) ? lo : null,
+          c: String(bar[`sfc_${i}`] ?? ""),
+        };
+      }),
+    });
+  }
+}
+
+function clearScriptOverlays() {
+  if (!chart) return;
+  for (let i = 0; i < MAX_SCRIPT_HLINES; i++) {
+    chart.removeIndicator({ name: `rust_script_hline_${i}` });
+    createdIndicators.delete(`rust_script_hline_${i}`);
+  }
+  for (let i = 0; i < MAX_SCRIPT_FILLS; i++) {
+    chart.removeIndicator({ name: `rust_script_fill_${i}` });
+    createdIndicators.delete(`rust_script_fill_${i}`);
+  }
+}
+
+/** 绘制脚本的 hline 和 fill。fill 的 from/to 是 plot key（p0/p1…），从对应 plot 的 Float64Array 取上下界。 */
+function drawScriptOverlays(hlines: ScriptHline[], fills: ScriptFill[], plots: ScriptPlot[]) {
+  if (!chart) return;
+  clearScriptOverlays();
+  const plotByKey = new Map(plots.map((p) => [p.key, p]));
+
+  hlines.slice(0, MAX_SCRIPT_HLINES).forEach((hl, i) => {
+    for (let k = 0; k < currentBars.length; k++) {
+      currentBars[k][`sh_${i}`] = hl.price;
+      currentBars[k][`shc_${i}`] = hl.color;
+    }
+    if (chart!.createIndicator({ name: `rust_script_hline_${i}` })) {
+      createdIndicators.add(`rust_script_hline_${i}`);
+    }
+  });
+
+  fills.slice(0, MAX_SCRIPT_FILLS).forEach((f, i) => {
+    const a = plotByKey.get(f.from)?.values;
+    const b = plotByKey.get(f.to)?.values;
+    if (!a || !b) return;
+    for (let k = 0; k < currentBars.length; k++) {
+      const va = a[k];
+      const vb = b[k];
+      const valid = Number.isFinite(va) && Number.isFinite(vb);
+      currentBars[k][`sf_hi_${i}`] = valid ? Math.max(va, vb) : null;
+      currentBars[k][`sf_lo_${i}`] = valid ? Math.min(va, vb) : null;
+      currentBars[k][`sfc_${i}`] = f.color;
+    }
+    if (chart!.createIndicator({ name: `rust_script_fill_${i}` })) {
+      createdIndicators.add(`rust_script_fill_${i}`);
+    }
+  });
 }
 
 function clearScriptPlots() {
@@ -800,8 +918,12 @@ async function onRunScript() {
     // 渲染 plot 线
     const plots = out.plots.map((p) => ({ color: p.color, title: p.title, data: p.values }));
     drawScriptPlots(plots);
+    // 渲染 hline / fill（fill 从原始 ScriptPlot 的 Float64Array 取数）
+    drawScriptOverlays(out.hlines, out.fills, out.plots);
     // 输出日志
     const lines: string[] = [`✓ 运行成功 (${out.ms}ms, ${out.plots.length} 条线)`];
+    if (out.hlines.length) lines.push(`参考线 ${out.hlines.length} 条`);
+    if (out.fills.length) lines.push(`区间填充 ${out.fills.length} 处`);
     if (out.meta) lines.push(`脚本: ${out.meta.name}`);
     if (out.logs.length) lines.push("", "日志:", ...out.logs);
     if (out.signals.length) lines.push("", `策略信号: ${out.signals.map((s) => s.id).join(", ")}`);
@@ -810,7 +932,7 @@ async function onRunScript() {
 
     // 策略脚本：把信号交给 Rust 回测引擎执行
     if (out.meta?.strategy && out.signals.length > 0) {
-      const cfg: BacktestConfig = { ...defaultBacktestConfig };
+      const cfg: BacktestConfig = readBacktestConfig();
       const { signals, closeSignals } = ScriptHost.signalsToBacktest(out, currentBars.length, cfg);
       const result = await runBacktest(currentSymbol, currentTimeframe, cfg, signals, closeSignals);
       renderBacktestResult(result);
@@ -987,6 +1109,59 @@ const defaultBacktestConfig: BacktestConfig = {
   trailing: 0,
 };
 
+const BT_CONFIG_KEY = "candlelab_bt_config";
+const btNumericFields: (keyof BacktestConfig)[] = [
+  "initial_capital", "size_value", "commission", "slippage",
+  "pyramiding", "stop_loss", "take_profit", "trailing",
+];
+
+// 从参数面板读取配置；面板未填或非法时回退到默认值。
+function readBacktestConfig(): BacktestConfig {
+  const cfg: BacktestConfig = { ...defaultBacktestConfig };
+  for (const key of btNumericFields) {
+    const el = document.querySelector<HTMLInputElement>(`[data-btp="${key}"]`);
+    if (!el) continue;
+    const v = Number(el.value);
+    if (Number.isFinite(v)) (cfg[key] as number) = v;
+  }
+  const sizeType = document.querySelector<HTMLSelectElement>('[data-btp="size_type"]');
+  if (sizeType) cfg.size_type = sizeType.value as BacktestConfig["size_type"];
+  const fillOn = document.querySelector<HTMLSelectElement>('[data-btp="fill_on"]');
+  if (fillOn) cfg.fill_on = fillOn.value as BacktestConfig["fill_on"];
+  // 基本约束：加仓层数至少 1，仓位/费率/止损等不允许为负。
+  cfg.pyramiding = Math.max(1, Math.floor(cfg.pyramiding));
+  for (const key of ["initial_capital", "size_value", "commission", "slippage", "stop_loss", "take_profit", "trailing"] as (keyof BacktestConfig)[]) {
+    if ((cfg[key] as number) < 0) (cfg[key] as number) = 0;
+  }
+  return cfg;
+}
+
+// 把配置写回面板并持久化。
+function applyBacktestConfig(cfg: BacktestConfig, persist = true) {
+  for (const key of btNumericFields) {
+    const el = document.querySelector<HTMLInputElement>(`[data-btp="${key}"]`);
+    if (el) el.value = String(cfg[key]);
+  }
+  const sizeType = document.querySelector<HTMLSelectElement>('[data-btp="size_type"]');
+  if (sizeType) sizeType.value = cfg.size_type;
+  const fillOn = document.querySelector<HTMLSelectElement>('[data-btp="fill_on"]');
+  if (fillOn) fillOn.value = cfg.fill_on;
+  if (persist) localStorage.setItem(BT_CONFIG_KEY, JSON.stringify(cfg));
+}
+
+function initBacktestConfig() {
+  let cfg = defaultBacktestConfig;
+  try {
+    const saved = localStorage.getItem(BT_CONFIG_KEY);
+    if (saved) cfg = { ...defaultBacktestConfig, ...JSON.parse(saved) };
+  } catch { /* 损坏的缓存直接回落默认 */ }
+  applyBacktestConfig(cfg, false);
+  document.querySelector<HTMLButtonElement>("#bt-config-reset")?.addEventListener("click", () => {
+    applyBacktestConfig(defaultBacktestConfig);
+    setStatus("回测参数已恢复默认");
+  });
+}
+
 async function onRunBacktest() {
   const btn = document.querySelector<HTMLButtonElement>("#bt-run")!;
   const resultEl = document.querySelector<HTMLDivElement>("#bt-result")!;
@@ -997,11 +1172,13 @@ async function onRunBacktest() {
   btn.disabled = true;
   resultEl.textContent = "计算中…";
   try {
+    const cfg = readBacktestConfig();
+    localStorage.setItem(BT_CONFIG_KEY, JSON.stringify(cfg));
     const signals = makeMaCrossSignals(currentBars);
     const result = await runBacktest(
       currentSymbol,
       currentTimeframe,
-      defaultBacktestConfig,
+      cfg,
       signals,
       [],
     );
@@ -1344,6 +1521,7 @@ async function main() {
   if (themeBtn) themeBtn.textContent = currentTheme === "dark" ? "☀" : "◐";
   registerRustIndicators();
   registerScriptPlotIndicator();
+  registerScriptOverlayIndicators();
   document.querySelector<HTMLTextAreaElement>("#sp-code")!.value = scriptExamples.ma;
   chart = init(chartEl, {
     locale: "zh-CN",
@@ -1356,6 +1534,7 @@ async function main() {
   chart.createIndicator("VOL");
   chart.setDataLoader(makeDataLoader());
   bindEvents();
+  initBacktestConfig();
   renderDrawingTools();
   renderAlertList();
   await loadSymbols();

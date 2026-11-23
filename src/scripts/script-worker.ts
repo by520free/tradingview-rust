@@ -225,7 +225,17 @@ function run(msg: RunMessage): { ok: boolean; result?: ScriptResult; error?: str
       return key;
     },
     hline(price: number, opts: { color?: string } = {}) {
-      out.hlines.push({ price: Number(price), color: opts.color || "#8E8A82" });
+      const p = Number(price);
+      if (!Number.isFinite(p)) throw new Error(`hline(): 价格必须是有限数字，收到 ${JSON.stringify(price)}`);
+      out.hlines.push({ price: p, color: opts.color || "#8E8A82" });
+    },
+    // 在两条 plot 线之间填色。plot() 返回 'p0'/'p1'…，直接把 key 传进来。
+    fill(from: unknown, to: unknown, opts: { color?: string } = {}) {
+      const f = String(from), t = String(to);
+      if (!/^p\d+$/.test(f) || !/^p\d+$/.test(t)) {
+        throw new Error(`fill(): 参数必须是 plot() 的返回值（如 p0、p1），收到 ${f} / ${t}`);
+      }
+      out.fills.push({ from: f, to: t, color: opts.color || "rgba(79,163,247,0.18)" });
     },
     marker(condition: unknown, opts: { shape?: string; position?: string; color?: string; text?: string } = {}) {
       const c = toSeries(condition, "marker()");

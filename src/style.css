@@ -130,6 +130,21 @@ html, body, #app { margin: 0; height: 100%; width: 100%; }
 .backtest-box { border: 1px solid var(--border-3); border-radius: 6px; padding: 9px; background: var(--surface-2); }
 .bt-strategy { font-size: 12px; font-weight: 500; color: var(--text-2); }
 .bt-sub { font-size: 10px; color: var(--text-4); font-weight: 400; }
+.bt-config { margin-top: 6px; }
+.bt-config > summary { font-size: 11px; color: var(--text-3); cursor: pointer; list-style: none; padding: 3px 0; user-select: none; }
+.bt-config > summary::-webkit-details-marker { display: none; }
+.bt-config > summary::before { content: "▸ "; color: var(--text-4); }
+.bt-config[open] > summary::before { content: "▾ "; }
+.bt-config > summary:hover { color: var(--text-2); }
+.bt-config-body { padding: 6px 0 2px; border-top: 1px solid var(--border); }
+.btp-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.btp-row label { font-size: 10px; color: var(--text-3); flex: 1; }
+.btp-row input, .btp-row select {
+  width: 84px; flex: 0 0 84px; padding: 3px 4px; font-size: 10px;
+  border: 1px solid var(--border-2); border-radius: 3px;
+  background: var(--surface); color: var(--text);
+}
+.btp-reset { width: 100%; height: 24px; margin-top: 4px; font-size: 10px; color: var(--text-3); }
 .bt-run {
   width: 100%; height: 28px; margin-top: 8px; border: none; border-radius: 5px;
   background: var(--accent); color: #fff; font-size: 12px; cursor: pointer;

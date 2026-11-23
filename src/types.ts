@@ -6,7 +6,8 @@ export interface Bar {
   close: number;
   volume: number;
   // Rust 指标值以 rust_<kind>_<lineIndex> 形式挂在 K 线上，供图表自定义指标读取。
-  [key: string]: number | null | undefined;
+  // 脚本 hline/fill 的颜色以字符串形式挂在 shc_*/sfc_* 扩展字段上。
+  [key: string]: number | string | null | undefined;
 }
 
 export interface IndicatorLine {

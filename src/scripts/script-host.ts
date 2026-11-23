@@ -18,6 +18,15 @@ export interface ScriptMarker {
   color: string;
   text: string;
 }
+export interface ScriptHline {
+  price: number;
+  color: string;
+}
+export interface ScriptFill {
+  from: string;
+  to: string;
+  color: string;
+}
 export interface ScriptStrategySignal {
   id: string;
   dir: "long" | "short";
@@ -38,6 +47,8 @@ export interface ScriptOutput {
     strategy: boolean;
   };
   plots: ScriptPlot[];
+  hlines: ScriptHline[];
+  fills: ScriptFill[];
   markers: ScriptMarker[];
   signals: ScriptStrategySignal[];
   closeSignals: { when: boolean[] | true }[];
@@ -54,6 +65,8 @@ interface RawResult {
   result?: {
     meta: ScriptOutput["meta"];
     plots: ScriptPlot[];
+    hlines: ScriptHline[];
+    fills: ScriptFill[];
     markers: ScriptMarker[];
     signals: ScriptStrategySignal[];
     closeSignals: { when: boolean[] | true }[];
@@ -87,6 +100,8 @@ export class ScriptHost {
         logs: raw.logs || [],
         ms: raw.ms,
         plots: raw.result?.plots || [],
+        hlines: raw.result?.hlines || [],
+        fills: raw.result?.fills || [],
         markers: raw.result?.markers || [],
         signals: raw.result?.signals || [],
         closeSignals: raw.result?.closeSignals || [],
@@ -100,7 +115,7 @@ export class ScriptHost {
         clearTimeout(entry.timer);
         entry.resolve({
           ok: false, error: `脚本运行时错误: ${e.message}`, line: null,
-          logs: [], ms: 0, plots: [], markers: [], signals: [], closeSignals: [],
+          logs: [], ms: 0, plots: [], hlines: [], fills: [], markers: [], signals: [], closeSignals: [],
           risk: { stopLoss: 0, takeProfit: 0, trailing: 0 },
         });
         this.pending.delete(id);
@@ -137,7 +152,7 @@ export class ScriptHost {
         this.worker = null;
         resolve({
           ok: false, error: `脚本超时（>${timeoutMs}ms），已终止`, line: null,
-          logs: [], ms: timeoutMs, plots: [], markers: [], signals: [], closeSignals: [],
+          logs: [], ms: timeoutMs, plots: [], hlines: [], fills: [], markers: [], signals: [], closeSignals: [],
           risk: { stopLoss: 0, takeProfit: 0, trailing: 0 },
         });
       }, timeoutMs);
