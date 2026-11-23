@@ -15,6 +15,8 @@ import {
   listSymbols,
   runBacktest,
   subscribeRealtime,
+  setProxy,
+  proxyStatus,
 } from "./api";
 import type {
   Bar,
@@ -211,6 +213,7 @@ app.innerHTML = `
         <button class="tf" data-tf="1d">日线</button>
       </div>
       <button id="refresh-btn" class="control btn">刷新</button>
+      <button id="proxy-btn" class="control btn" title="设置数据代理">代理</button>
       <button id="realtime-btn" class="control btn">实时:关</button>
       <button id="script-toggle" class="control btn">脚本</button>
       <button id="export-btn" class="control btn" title="导出图表 PNG (G)">导出</button>
@@ -1421,6 +1424,31 @@ function bindEvents() {
       setStatus(`${currentSymbol} · ${bars.length} 根 K 线（已刷新）`);
     } catch (e) {
       setStatus(`刷新失败: ${String(e)}`, "err");
+    }
+  });
+
+  // 代理设置：输入 http://127.0.0.1:端口，留空恢复自动探测
+  const proxyBtn = document.querySelector<HTMLButtonElement>("#proxy-btn")!;
+  proxyBtn.addEventListener("click", async () => {
+    const current = await proxyStatus().catch(() => null);
+    const input = window.prompt(
+      "设置数据代理（Binance 需代理才能访问）\n\n" +
+        "输入代理地址如 http://127.0.0.1:1081\n" +
+        "留空并确定 = 恢复自动探测\n" +
+        (current ? `\n当前代理：${current}` : "\n当前：自动探测"),
+      current || "",
+    );
+    if (input === null) return; // 取消
+    try {
+      const applied = await setProxy(input.trim() || null);
+      proxyBtn.title = applied ? `代理: ${applied}` : "代理: 自动探测";
+      setStatus("代理已更新，重新加载数据…", "busy");
+      const bars = await reloadBars(currentSymbol, currentTimeframe, 1000);
+      currentBars = bars;
+      if (chart) chart.setDataLoader(makeDataLoader());
+      setStatus(`${currentSymbol} · ${bars.length} 根 K 线（代理 ${applied || "自动"}）`);
+    } catch (e) {
+      setStatus(`代理设置/加载失败: ${String(e)}`, "err");
     }
   });
 

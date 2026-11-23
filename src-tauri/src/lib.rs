@@ -124,6 +124,20 @@ fn import_csv(path: String) -> Result<Vec<Bar>, String> {
     data::csv::import_csv(&path)
 }
 
+/// 手动设置数据代理（如 http://127.0.0.1:1081），传 null 恢复自动探测。
+/// 设置后需前端清缓存重新加载 K 线（reload_bars）。
+#[tauri::command]
+fn set_proxy(url: Option<String>) -> Option<String> {
+    data::proxy::set_override(url);
+    data::proxy::current()
+}
+
+/// 查询当前使用的代理（未探测时返回 None）。
+#[tauri::command]
+fn proxy_status() -> Option<String> {
+    data::proxy::current()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -138,7 +152,9 @@ pub fn run() {
             list_indicators,
             list_symbols,
             subscribe_realtime,
-            import_csv
+            import_csv,
+            set_proxy,
+            proxy_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running CandleLab");

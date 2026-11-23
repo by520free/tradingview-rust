@@ -74,3 +74,13 @@ export async function subscribeRealtime(
 export async function importCsv(path: string): Promise<Bar[]> {
   return invoke<Bar[]>("import_csv", { path });
 }
+
+/** 手动设置数据代理（如 http://127.0.0.1:1081）；null 恢复自动探测。 */
+export async function setProxy(url: string | null): Promise<string | null> {
+  return invoke<string | null>("set_proxy", { url });
+}
+
+/** 查询当前使用的代理。 */
+export async function proxyStatus(): Promise<string | null> {
+  return invoke<string | null>("proxy_status");
+}
